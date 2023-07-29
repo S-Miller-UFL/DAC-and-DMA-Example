@@ -4,7 +4,7 @@
 
 clock.s
 
-lab8_2.c
+lab8_2b.C
 
 sinewave_table.C
 

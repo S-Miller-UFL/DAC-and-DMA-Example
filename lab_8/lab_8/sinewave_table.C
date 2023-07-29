@@ -6,7 +6,7 @@
 //Description: array that contains data points to make a sinewave from 0 to 4095
 //*******************************************
 #include <avr/io.h>
-volatile uint8_t* sine_wave =
+volatile uint16_t sine_wave[256] =
 {
 	0x800,0x832,0x864,0x896,0x8c8,0x8fa,0x92c,0x95e,
 	0x98f,0x9c0,0x9f1,0xa22,0xa52,0xa82,0xab1,0xae0,
