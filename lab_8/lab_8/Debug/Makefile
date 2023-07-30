@@ -37,7 +37,8 @@ SUBDIRS :=
 
 # Add inputs and outputs from these tool invocations to the build variables 
 C_SRCS +=  \
-../lab8_3.C \
+../triwave_table.C \
+../lab8_5.C \
 ../sinewave_table.C
 
 
@@ -50,22 +51,26 @@ ASM_SRCS +=
 
 OBJS +=  \
 clock.o \
-lab8_3.o \
+triwave_table.o \
+lab8_5.o \
 sinewave_table.o
 
 OBJS_AS_ARGS +=  \
 clock.o \
-lab8_3.o \
+triwave_table.o \
+lab8_5.o \
 sinewave_table.o
 
 C_DEPS +=  \
 clock.d \
-lab8_3.d \
+triwave_table.d \
+lab8_5.d \
 sinewave_table.d
 
 C_DEPS_AS_ARGS +=  \
 clock.d \
-lab8_3.d \
+triwave_table.d \
+lab8_5.d \
 sinewave_table.d
 
 OUTPUT_FILE_PATH +=lab_8.elf
@@ -82,7 +87,14 @@ LINKER_SCRIPT_DEP+=
 
 
 # AVR32/GNU C Compiler
-./lab8_3.o: .././lab8_3.C
+./triwave_table.o: .././triwave_table.C
+	@echo Building file: $<
+	@echo Invoking: AVR/GNU C Compiler : 5.4.0
+	$(QUOTE)C:\Program Files (x86)\Atmel\Studio\7.0\toolchain\avr8\avr8-gnu-toolchain\bin\avr-gcc.exe$(QUOTE)  -x c -funsigned-char -funsigned-bitfields -DDEBUG  -I"C:\Program Files (x86)\Atmel\Studio\7.0\Packs\atmel\XMEGAA_DFP\1.3.146\include"  -O0 -ffunction-sections -fdata-sections -fpack-struct -fshort-enums -g2 -Wall -mmcu=atxmega128a1u -B "C:\Program Files (x86)\Atmel\Studio\7.0\Packs\atmel\XMEGAA_DFP\1.3.146\gcc\dev\atxmega128a1u" -c -std=gnu99 -MD -MP -MF "$(@:%.o=%.d)" -MT"$(@:%.o=%.d)" -MT"$(@:%.o=%.o)"   -o "$@" "$<" 
+	@echo Finished building: $<
+	
+
+./lab8_5.o: .././lab8_5.C
 	@echo Building file: $<
 	@echo Invoking: AVR/GNU C Compiler : 5.4.0
 	$(QUOTE)C:\Program Files (x86)\Atmel\Studio\7.0\toolchain\avr8\avr8-gnu-toolchain\bin\avr-gcc.exe$(QUOTE)  -x c -funsigned-char -funsigned-bitfields -DDEBUG  -I"C:\Program Files (x86)\Atmel\Studio\7.0\Packs\atmel\XMEGAA_DFP\1.3.146\include"  -O0 -ffunction-sections -fdata-sections -fpack-struct -fshort-enums -g2 -Wall -mmcu=atxmega128a1u -B "C:\Program Files (x86)\Atmel\Studio\7.0\Packs\atmel\XMEGAA_DFP\1.3.146\gcc\dev\atxmega128a1u" -c -std=gnu99 -MD -MP -MF "$(@:%.o=%.d)" -MT"$(@:%.o=%.d)" -MT"$(@:%.o=%.o)"   -o "$@" "$<" 

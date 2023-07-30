@@ -126,6 +126,9 @@
     <Compile Include="clock.s">
       <SubType>compile</SubType>
     </Compile>
+    <Compile Include="triwave_table.C">
+      <SubType>compile</SubType>
+    </Compile>
     <None Include="lab8_1.c">
       <SubType>compile</SubType>
     </None>
@@ -135,7 +138,13 @@
     <None Include="lab8_2b.C">
       <SubType>compile</SubType>
     </None>
-    <Compile Include="lab8_3.C">
+    <None Include="lab8_3.C">
+      <SubType>compile</SubType>
+    </None>
+    <None Include="lab8_4.C">
+      <SubType>compile</SubType>
+    </None>
+    <Compile Include="lab8_5.C">
       <SubType>compile</SubType>
     </Compile>
     <Compile Include="sinewave_table.C">
