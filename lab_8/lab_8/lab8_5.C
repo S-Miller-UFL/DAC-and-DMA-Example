@@ -13,9 +13,15 @@
 extern void clock_init(void);
 extern uint16_t sine_wave[256];
 extern uint16_t triangle_wave[256];
-volatile uint16_t sine_wave_address = (&sine_wave);
-volatile uint16_t triangle_wave_address = (&sine_wave);
+//global variables
 volatile uint8_t poweramp_on = (0x01<<7);
+volatile uint8_t wave_type = 0; //0 = sine/ 1 = triangle
+volatile int8_t bsel = 5;
+volatile int8_t bscale = -6;
+volatile uint8_t DMA_CH_DISABLE_bm = (0x1<<7);
+volatile uint8_t switch_wave_flag = 0;
+volatile uint8_t switch_frequency_flag = 0;
+/////////////////////
 int main(void)
 {
 	//set system clock to 32 mhz
@@ -28,12 +34,37 @@ int main(void)
 	tcc0_init();
 	//initialize DMA system
 	DMA_CH0_INIT();
+	//DMA_CH1_INIT();
+	//initialize usart
+	usartd0_init();
+	//enable global interrupts
+	PMIC.CTRL = PMIC_MEDLVLEN_bm;
+	sei();
 	//start tcc0 timer
 	TCC0.CTRLA = TC_CLKSEL_DIV2_gc;
 	//dummy loop
 	while (1)
 	{
-		//DO NOTHING
+		//check if we need to switch waveforms
+		if(switch_wave_flag == 1)
+		{
+			switch_wave_flag = 0;
+			//switch to triangle wave
+			if(wave_type == 1)
+			{
+				switch_waves(1);
+			}
+			//switch to sine wave
+			else if (wave_type == 0)
+			{
+				switch_waves(0);
+			}
+		}
+		//check if we need to switch frequencies
+		else if (switch_frequency_flag)
+		{
+			switch_frequency_flag = 0;
+		}
 	}
 }
 
@@ -60,10 +91,13 @@ void tcc0_init(void)
 
 void DMA_CH0_INIT(void)
 {
+	//initialize DMA system
+	DMA.CTRL = DMA_CH_DISABLE_bm;
+	DMA.CTRL = DMA_RESET_bm;
 	//set beginning of sinewave table as source address on ch0
-	DMA.CH0.SRCADDR0 = (uint8_t)((uintptr_t)triangle_wave);
-	DMA.CH0.SRCADDR1 = (uint8_t)(((uintptr_t)triangle_wave)>>8);
-	DMA.CH0.SRCADDR2 = (uint8_t)((uint32_t)(((uintptr_t)triangle_wave)>>16));
+	DMA.CH0.SRCADDR0 = (uint8_t)((uintptr_t)sine_wave);
+	DMA.CH0.SRCADDR1 = (uint8_t)(((uintptr_t)sine_wave)>>8);
+	DMA.CH0.SRCADDR2 = (uint8_t)((uint32_t)(((uintptr_t)sine_wave)>>16));
 	//set daca ch1 register as destination address
 	DMA.CH0.DESTADDR0 = (uint8_t)((uintptr_t)&DACA.CH1DATA);
 	DMA.CH0.DESTADDR1 = (uint8_t)(((uintptr_t)&DACA.CH1DATA)>>8);
@@ -71,20 +105,22 @@ void DMA_CH0_INIT(void)
 	//set block transfer size on ch0 to 512 bytes
 	DMA.CH0.TRFCNT = 512;
 	//set burst size to 2 bytes and turn on repeat mode
-	DMA.CH0.CTRLA |= (DMA_CH_BURSTLEN_2BYTE_gc |DMA_CH_REPEAT_bm);
+	DMA.CH0.CTRLA = (DMA_CH_BURSTLEN_2BYTE_gc |DMA_CH_REPEAT_bm);
 	//enable single shot mode
 	DMA.CH0.CTRLA |= DMA_CH_SINGLE_bm;
 	//set dma ch0 to reload source address after block transfer and
 	//destination address after burst transfer
-	DMA.CH0.ADDRCTRL |= (DMA_CH_SRCRELOAD_BLOCK_gc |  DMA_CH_DESTRELOAD_BURST_gc);
+	DMA.CH0.ADDRCTRL = (DMA_CH_SRCRELOAD_BLOCK_gc |  DMA_CH_DESTRELOAD_BURST_gc);
 	//set dma to increment source and destination address after byte transfer
 	DMA.CH0.ADDRCTRL |= (DMA_CH_SRCDIR_INC_gc|DMA_CH_DESTDIR_INC_gc);
 	//set dma ch0 as event channel 0 user
-	DMA.CH0.TRIGSRC |= DMA_CH_TRIGSRC_EVSYS_CH0_gc;
+	DMA.CH0.TRIGSRC = DMA_CH_TRIGSRC_EVSYS_CH0_gc;
 	//enable dma ch0
-	DMA.CTRL |= DMA_ENABLE_bm;
+	DMA.CTRL = DMA_ENABLE_bm;
 	DMA.CH0.CTRLA |= DMA_CH_ENABLE_bm;
+
 }
+
 
 void poweramp_init(void)
 {
@@ -93,7 +129,26 @@ void poweramp_init(void)
 	PORTC.DIRSET = poweramp_on; 
 	
 }
+void usartd0_init(void)
+{
+	//initialize transmitter and reciever pins
+	PORTD.OUTSET = PIN3_bm;
+	PORTD.DIRSET = PIN3_bm;
+	PORTD.DIRCLR = PIN2_bm;
 
+	//set baud rate
+	USARTD0.BAUDCTRLA = (uint8_t)bsel;
+	USARTD0.BAUDCTRLB = (uint8_t)((bscale << 4)|(bsel >> 4));
+
+	//set to 8 bit odd parity with 1 stop bit
+	USARTD0.CTRLC =	(USART_CMODE_ASYNCHRONOUS_gc |USART_PMODE_ODD_gc| USART_CHSIZE_8BIT_gc)&(~USART_SBMODE_bm);
+
+	//ENABLE TRANSMITTER AND RECIEVER
+	USARTD0.CTRLB = USART_RXEN_bm;
+	
+	//enable interrupts
+	USARTD0.CTRLA = USART_RXCINTLVL_MED_gc;
+}
 /*
 	E = 61
 	4 = 57
@@ -112,5 +167,93 @@ void poweramp_init(void)
 */
 ISR(USARTD0_RXC_vect)
 {
+	char data = 'S';
+	//FOR DEBUGGING ONLY
+	USARTD0.DATA = data;
+	while(!(USARTD0.STATUS & USART_DREIF_bm))
+	{
+		//do nothing
+	}
+	///////////////////
+	if(data == 'S')
+	{
+		if(wave_type == 1)
+		{
+			//SWITCH TO SINE WAVE
+			wave_type = 0;
+			switch_wave_flag = 1;
+		}
+		else if(wave_type == 0)
+		{
+			//SWITCH TO	TRIANGLE WAVE
+			wave_type = 1;
+			switch_wave_flag = 1;
+		}
+	}
+	
+}
+
+void switch_waves(uint8_t flag)
+{
+	//switch to sine
+	if(flag == 0)
+	{
+		//initialize DMA system
+		DMA.CTRL = DMA_CH_DISABLE_bm;
+		DMA.CTRL = DMA_RESET_bm;
+		//set beginning of sinewave table as source address on ch0
+		DMA.CH0.SRCADDR0 = (uint8_t)((uintptr_t)sine_wave);
+		DMA.CH0.SRCADDR1 = (uint8_t)(((uintptr_t)sine_wave)>>8);
+		DMA.CH0.SRCADDR2 = (uint8_t)((uint32_t)(((uintptr_t)sine_wave)>>16));
+		//set daca ch1 register as destination address
+		DMA.CH0.DESTADDR0 = (uint8_t)((uintptr_t)&DACA.CH1DATA);
+		DMA.CH0.DESTADDR1 = (uint8_t)(((uintptr_t)&DACA.CH1DATA)>>8);
+		DMA.CH0.DESTADDR2 = (uint8_t)((uint32_t)(((uintptr_t)&DACA.CH1DATA)>>16));
+		//set block transfer size on ch0 to 512 bytes
+		DMA.CH0.TRFCNT = 512;
+		//set burst size to 2 bytes and turn on repeat mode
+		DMA.CH0.CTRLA = (DMA_CH_BURSTLEN_2BYTE_gc |DMA_CH_REPEAT_bm |DMA_CH_SINGLE_bm);
+		//enable single shot mode
+		DMA.CH0.CTRLA |= DMA_CH_SINGLE_bm;
+		//set dma ch0 to reload source address after block transfer and
+		//destination address after burst transfer
+		DMA.CH0.ADDRCTRL = (DMA_CH_SRCRELOAD_BLOCK_gc |  DMA_CH_DESTRELOAD_BURST_gc);
+		//set dma to increment source and destination address after byte transfer
+		DMA.CH0.ADDRCTRL |= (DMA_CH_SRCDIR_INC_gc|DMA_CH_DESTDIR_INC_gc);
+		//set dma ch0 as event channel 0 user
+		DMA.CH0.TRIGSRC = DMA_CH_TRIGSRC_EVSYS_CH0_gc;
+		//enable dma ch0
+		DMA.CTRL = DMA_ENABLE_bm;
+		DMA.CH0.CTRLA |= DMA_CH_ENABLE_bm;
+	}
+	//switch to triangle
+	else if(flag ==1)
+	{
+		//initialize DMA system
+		DMA.CTRL = DMA_CH_DISABLE_bm;
+		DMA.CTRL = DMA_RESET_bm;
+		//set beginning of sinewave table as source address on ch0
+		DMA.CH0.SRCADDR0 = (uint8_t)((uintptr_t)triangle_wave);
+		DMA.CH0.SRCADDR1 = (uint8_t)(((uintptr_t)triangle_wave)>>8);
+		DMA.CH0.SRCADDR2 = (uint8_t)((uint32_t)(((uintptr_t)triangle_wave)>>16));
+		//set daca ch1 register as destination address
+		DMA.CH0.DESTADDR0 = (uint8_t)((uintptr_t)&DACA.CH1DATA);
+		DMA.CH0.DESTADDR1 = (uint8_t)(((uintptr_t)&DACA.CH1DATA)>>8);
+		DMA.CH0.DESTADDR2 = (uint8_t)((uint32_t)(((uintptr_t)&DACA.CH1DATA)>>16));
+		//set block transfer size on ch0 to 512 bytes
+		DMA.CH0.TRFCNT = 512;
+		//set burst size to 2 bytes and turn on repeat mode
+		DMA.CH0.CTRLA = (DMA_CH_BURSTLEN_2BYTE_gc |DMA_CH_REPEAT_bm |DMA_CH_SINGLE_bm);
+		//set dma ch0 to reload source address after block transfer and
+		//destination address after burst transfer
+		DMA.CH0.ADDRCTRL = (DMA_CH_SRCRELOAD_BLOCK_gc |  DMA_CH_DESTRELOAD_BURST_gc);
+		//set dma to increment source and destination address after byte transfer
+		DMA.CH0.ADDRCTRL |= (DMA_CH_SRCDIR_INC_gc|DMA_CH_DESTDIR_INC_gc);
+		//set dma ch0 as event channel 0 user
+		DMA.CH0.TRIGSRC = DMA_CH_TRIGSRC_EVSYS_CH0_gc;
+		//enable dma ch0
+		DMA.CTRL = DMA_ENABLE_bm;
+		DMA.CH0.CTRLA |= DMA_CH_ENABLE_bm;
+	} 
 	
 }
