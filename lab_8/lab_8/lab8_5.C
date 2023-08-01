@@ -16,8 +16,8 @@ extern uint16_t triangle_wave[256];
 //global variables
 volatile uint8_t poweramp_on = (0x01<<7);
 volatile uint8_t wave_type = 0; //0 = sine/ 1 = triangle
-volatile int8_t bsel = 65;
-volatile int8_t bscale = -2;
+volatile int8_t bsel = 4;
+volatile int8_t bscale = 1;
 volatile uint8_t DMA_CH_DISABLE_bm = (0x1<<7);
 volatile uint8_t switch_wave_flag = 0;
 volatile uint8_t switch_frequency_flag = 0;
@@ -36,13 +36,11 @@ int main(void)
 	tcc0_init();
 	//initialize DMA system
 	DMA_CH0_INIT();
-	//initialize usart
+	//initialize usart set baud rate to 200000
 	usartd0_init();
 	//enable global interrupts
 	PMIC.CTRL = PMIC_MEDLVLEN_bm;
 	sei();
-	//start tcc0 timer
-	//TCC0.CTRLA = TC_CLKSEL_DIV2_gc;
 	while (1)
 	{
 			//check if we need to switch waveforms
@@ -66,7 +64,7 @@ int main(void)
 				TCC0.CTRLA = TC_CLKSEL_DIV2_gc;
 				TCC0.PER = note;
 				//keep timer on for certain amount of time
-				for(volatile uint16_t i =0;i < 50000; i++)
+				for(volatile uint16_t i =0;i < 32767; i++)
 				{
 					while(!(TCC0.INTFLAGS &TC0_OVFIF_bm))
 					{
@@ -104,7 +102,7 @@ void tcc0_init(void)
 
 void DMA_CH0_INIT(void)
 {
-	//initialize DMA system
+	//RESET DMA SYSTEM
 	DMA.CTRL = DMA_CH_DISABLE_bm;
 	DMA.CTRL = DMA_RESET_bm;
 	//set beginning of sinewave table as source address on ch0
@@ -159,7 +157,7 @@ void usartd0_init(void)
 	//ENABLE TRANSMITTER AND RECIEVER
 	USARTD0.CTRLB = USART_RXEN_bm | USART_TXEN_bm;
 	
-	//enable interrupts
+	//enable reciever interrupts
 	USARTD0.CTRLA = USART_RXCINTLVL_MED_gc;
 }
 ISR(USARTD0_RXC_vect)
